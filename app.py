@@ -47,7 +47,13 @@ def callback():
 
 
 # 收到使用者文字訊息
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=Message)
+def handle_message(event):
+    user_id = event.source.user_id
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=f"你的 User ID 是：{user_id}")
+    )
 def handle_message(event: MessageEvent):
     user_id = event.source.user_id
     user_text = event.message.text.strip()
