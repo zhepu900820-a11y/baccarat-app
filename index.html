@@ -1,11 +1,465 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>百家樂工具測試</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>百家樂推算器（PWA）</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#1f2228; --panel:#0f2b17; --tile-a:#0f1420; --tile-b:#182017;
+    --text:#fff; --muted:#d7d7d7; --accentB:#8b2b2b; --accentP:#2b3b8b; --accentT:#335533;
+    --btn:#2c2f36; --blue:#2f55ff; --red:#ba2b2b; --green:#0f2b17;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,"PingFang TC","Noto Sans TC",sans-serif;}
+  .wrap{max-width:900px;margin:0 auto;padding:env(safe-area-inset-top) 16px 16px 16px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;font-family:Menlo,monospace;font-size:12px;margin-top:4px;}
+  .bank{color:#ffb3b3}
+  .board{background:var(--panel);border-radius:10px;padding:10px;margin-top:8px;}
+  .board-head{display:grid;grid-template-columns:76px 1fr 1fr 1fr;gap:6px;align-items:center}
+  .board-head .h{ text-align:center; }
+  .sides{display:grid;grid-template-columns:76px 1fr 1fr 1fr;gap:6px;margin-top:6px;}
+  .sidebtn{height:72px;border-radius:8px;border:none;color:#fff;font-weight:600;font-size:18px}
+  .sidebtn.p{background:#2f55ff;}
+  .sidebtn.b{background:#ba2b2b;}
+  .cells{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;height:72px}
+  .cell{background:var(--tile-a);border-radius:8px;display:flex;align-items:center;justify-content:center;font:20px Menlo,monospace;position:relative}
+  .cell.c3,.cell.c6{background:var(--tile-b);}
+  .cursor{position:absolute;left:-8px;width:8px;height:8px;border-radius:50%;background:#ff3344;top:50%;transform:translateY(-50%)}
+  .pred{border-radius:10px;margin-top:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+  .pred .l1{font-weight:800;text-align:center;font-size:16px}
+  .pred .l2{font-family:Menlo,monospace;text-align:center;font-size:12px;color:#fff}
+  .fastrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+  .fastrow button{height:44px;border-radius:8px;border:none;color:#fff;font-weight:700}
+  .fastP{background:#2b3b8b}.fastT{background:#335533}.fastB{background:#8b2b2b}
+  .kb{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-top:10px}
+  .kb button{height:44px;border-radius:8px;border:none;background:var(--btn);color:#fff;font-weight:700}
+  .log{margin-top:10px;background:#111418;border-radius:10px;padding:8px;height:24vh;overflow:auto;font:12px Menlo,monospace;color:var(--muted);white-space:pre-wrap}
+  .hdr{opacity:.85;font-size:12px;text-align:center}
+  .muted{opacity:.8}
+  .hidden{display:none}
+</style>
 </head>
-<body style="background:#111;color:#fff;text-align:center;font-family:sans-serif">
-  <h1>🎲 GitHub Pages 測試成功！</h1>
-  <p>這是你的第一個網頁 ✅</p>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div id="rounds">剩餘局數：20</div>
+    <div id="bank" class="bank">資金 0｜盈虧 +0</div>
+  </div>
+
+  <div class="board">
+    <div class="board-head">
+      <div></div>
+      <div class="h">開牌1</div>
+      <div class="h">開牌2</div>
+      <div class="h">補牌</div>
+    </div>
+
+    <div class="sides">
+      <button class="sidebtn p" id="btnP">閒</button>
+      <div class="cells">
+        <div class="cell c1" data-idx="0"></div>
+        <div class="cell c2" data-idx="1"></div>
+        <div class="cell c3" data-idx="2"></div>
+      </div>
+      <div class="hdr"> </div>
+      <div class="hdr"> </div>
+    </div>
+
+    <div class="sides">
+      <button class="sidebtn b" id="btnB">莊</button>
+      <div class="cells">
+        <div class="cell c4" data-idx="3"></div>
+        <div class="cell c5" data-idx="4"></div>
+        <div class="cell c6" data-idx="5"></div>
+      </div>
+      <div class="hdr"> </div>
+      <div class="hdr"> </div>
+    </div>
+  </div>
+
+  <div id="pred" class="pred" style="background:#2b3b8b">
+    <div class="l1" id="pred1">—</div>
+    <div class="l2" id="pred2">—</div>
+  </div>
+
+  <div class="fastrow">
+    <button class="fastP" id="fastP">路單：閒</button>
+    <button class="fastT" id="fastT">路單：和</button>
+    <button class="fastB" id="fastB">路單：莊</button>
+  </div>
+
+  <div class="kb" id="kb">
+    <!-- 1~4 -->
+    <button>1</button><button>2</button><button>3</button><button>4</button>
+    <!-- 5~8 -->
+    <button>5</button><button>6</button><button>7</button><button>8</button>
+    <!-- 9,10,J,Q -->
+    <button>9</button><button>10</button><button>J</button><button>Q</button>
+    <!-- 跳過,K,清除,確認 -->
+    <button>跳過</button><button>K</button><button>清除</button><button>確認</button>
+  </div>
+
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+// ===== 狀態 =====
+const MIN_BET = 100;
+const PAYOUTS = { 'B':0.95, 'P':1.0, 'T':8.0 };
+const HISTORY_LOOKBACK = 8;
+const LOG_MAX_LINES = 120;
+const SEQ_1324 = [1,3,2,4];
+
+const COUNT_STRENGTH = 0.12;   // 算牌影響上限（±12%）
+const COUNT_SMOOTH_K = 6.0;    // 平滑
+const CONF_CAP_MIN   = 0.52;
+const CONF_CAP_MAX   = 0.92;
+
+const STATE = {
+  rounds_left: 20,
+  seed: 0,
+  bankroll: 0,
+  history: [],
+  logs: [],
+  last_advice: { side:'B', bet:MIN_BET, conf:0.6 },
+  current: {
+    p:[null,null,null],
+    b:[null,null,null],
+    pf:[null,null,null],
+    bf:[null,null,null],
+    res:null,
+    cursor:0
+  },
+  count: 0,     // 內部計分（不顯示）
+  seq_idx: 0
+};
+
+// ===== 工具 =====
+const el = s => document.querySelector(s);
+
+function keyToVal(face){
+  return (face==='10'||face==='J'||face==='Q'||face==='K') ? 0 : parseInt(face,10);
+}
+
+// 新算牌法：1(A):+1; 2:+1; 3:+2; 4:+3; 5/6/7:-2; 8:-1; 9/10/J/Q/K:0
+function faceCountVal(face){
+  if(face==='1') return +1;
+  if(face==='2') return +1;
+  if(face==='3') return +2;
+  if(face==='4') return +3;
+  if(['5','6','7'].includes(face)) return -2;
+  if(face==='8') return -1;
+  if(['9','10','J','Q','K'].includes(face)) return 0;
+  return 0;
+}
+
+function sum2(a,b){
+  if(a==null || b==null) return null;
+  return (a+b)%10;
+}
+function finalTotal(two, third){
+  const s2 = sum2(two[0], two[1]);
+  if(s2==null) return null;
+  if(third==null) return s2;
+  return (two[0]+two[1]+third)%10;
+}
+function mustPlayerDraw(p2){ return p2!=null && p2<=5; }
+function playerMustStand(p2){ return p2!=null && p2>=6 && p2<=7; }
+
+function bankerShouldDraw(b2, p3){
+  if(b2==null) return false;
+  if(b2<=2) return true;
+  if(b2===3) return (p3!=null) && (p3!==8);
+  if(b2===4) return (p3!=null) && (p3>=2 && p3<=7);
+  if(b2===5) return (p3!=null) && (p3>=4 && p3<=7);
+  if(b2===6) return (p3!=null) && (p3>=6 && p3<=7);
+  return false; // 7 stand
+}
+function bankerDrawWhenPlayerStands(b2){ return b2!=null && b2<=5; }
+
+// —— AI：路單預測（方向+信心） —— //
+function predictNext(history){
+  if(!history.length) return ['B', 0.55];
+  const seq = history.map(h=>h.res).filter(x=>['B','P','T'].includes(x));
+  const seqNP = seq.filter(x=>x!=='T');
+  if(!seqNP.length) return ['B', 0.55];
+
+  const last = seqNP[seqNP.length-1], n = seqNP.length;
+
+  // 長龍
+  let st = 1;
+  for(let i=n-2;i>=0;i--){
+    if(seqNP[i]===seqNP[i+1]) st++;
+    else break;
+  }
+  if(st>=4) return [last, 0.88];
+  if(st===3) return [last, 0.78];
+  if(st===2){
+    const look = seqNP.slice(-HISTORY_LOOKBACK);
+    const bRatio = look.filter(x=>x==='B').length / Math.min(HISTORY_LOOKBACK, n);
+    if(last==='B') return ['B', bRatio>=0.55 ? 0.68 : 0.60];
+    else           return ['P', bRatio< 0.45 ? 0.68 : 0.60];
+  }
+
+  // 對跳
+  const w6 = seqNP.slice(-6);
+  if(w6.length>=4 && w6.every((x,i)=> i===0 || x!==w6[i-1])){
+    return [last==='B'?'P':'B', 0.72];
+  }
+
+  // 近期偏好
+  const w = seqNP.slice(-HISTORY_LOOKBACK);
+  const b = w.filter(x=>x==='B').length, p = w.filter(x=>x==='P').length;
+  if(b>=p+2) return ['B', 0.63];
+  if(p>=b+2) return ['P', 0.63];
+
+  if(seq.slice(-3).includes('T')) return [last, 0.58];
+  return [last==='B'?'P':'B', 0.57];
+}
+
+// —— 融合：AI × 算牌分數 → 單一建議 —— //
+function fuseWithCount(aiSide, aiConf, count){
+  if(aiSide==='T') return ['T', Math.max(Math.min(aiConf, CONF_CAP_MAX), 0.5)];
+  const delta = COUNT_STRENGTH * Math.tanh(Math.abs(count)/COUNT_SMOOTH_K);
+  const favors = count>0 ? 'B' : (count<0 ? 'P' : null);
+
+  let side = aiSide, conf = aiConf;
+  if(favors==null){ /* no-op */ }
+  else if(favors===aiSide){ conf += delta; }
+  else { conf -= delta; }
+
+  conf = Math.max(Math.min(conf, CONF_CAP_MAX), 0.0);
+  if(conf < 0.5){
+    side = (aiSide==='B'?'P':'B');
+    conf = Math.max(1.0-conf, CONF_CAP_MIN);
+    conf = Math.min(conf, CONF_CAP_MAX);
+  }
+  return [side, conf];
+}
+
+function appendLog(line){
+  STATE.logs.push(line);
+  if(STATE.logs.length>LOG_MAX_LINES) STATE.logs = STATE.logs.slice(-LOG_MAX_LINES);
+  el('#log').textContent = STATE.logs.join('\n');
+  el('#log').scrollTop = el('#log').scrollHeight;
+}
+
+// ===== UI 更新 =====
+function updateTop(){
+  el('#rounds').textContent = `剩餘局數：${STATE.rounds_left}`;
+  const pnl = STATE.bankroll - STATE.seed;
+  el('#bank').textContent = `資金 ${STATE.bankroll}｜盈虧 ${pnl>=0?'+':''}${pnl}`;
+}
+function cellText(idx, txt){
+  const c = document.querySelector(`.cell[data-idx="${idx}"]`);
+  c.textContent = txt;
+  if(!c.querySelector('.cursor') && idx===STATE.current.cursor){
+    const d = document.createElement('div'); d.className='cursor'; c.appendChild(d);
+  }
+}
+function paintBoard(){
+  // 清
+  document.querySelectorAll('.cell').forEach(c=>{
+    c.innerHTML='';
+  });
+  // 值
+  const v = STATE.current;
+  const vals = [v.p[0],v.p[1],v.p[2],v.b[0],v.b[1],v.b[2]];
+  vals.forEach((x,i)=>{ if(x!==null) cellText(i, String(x)); });
+
+  // 游標
+  const tgt = document.querySelector(`.cell[data-idx="${STATE.current.cursor}"]`);
+  if(tgt){
+    const d = document.createElement('div');
+    d.className='cursor';
+    tgt.appendChild(d);
+  }
+
+  updatePrediction();
+}
+
+function updatePrediction(){
+  const [aiSide, aiConf] = predictNext(STATE.history);
+  const [side, conf] = fuseWithCount(aiSide, aiConf, STATE.count);
+  const units = SEQ_1324[STATE.seq_idx];
+  const bet = units * MIN_BET;
+
+  STATE.last_advice = { side, bet, conf };
+
+  const sideTxt = {B:'莊', P:'閒', T:'和'}[side];
+  el('#pred1').textContent = `${sideTxt} ${Math.round(conf*100)}%   建議下注: ${bet}`;
+  el('#pred2').textContent = `1324步驟: ${STATE.seq_idx+1} (${bet}$)`;
+  const bg = side==='B'? '#8b2b2b' : (side==='P'? '#2b3b8b' : '#335533');
+  el('#pred').style.background = bg;
+}
+
+// ===== 行為 =====
+el('#btnP').addEventListener('click', ()=>{ STATE.current.res='P'; paintBoard(); });
+el('#btnB').addEventListener('click', ()=>{ STATE.current.res='B'; paintBoard(); });
+
+el('#fastP').addEventListener('click', ()=>{ quickResult('P'); });
+el('#fastT').addEventListener('click', ()=>{ quickResult('T'); });
+el('#fastB').addEventListener('click', ()=>{ quickResult('B'); });
+
+function quickResult(res){
+  STATE.history.push({res, p:[null,null,null], b:[null,null,null]});
+  appendLog(`📌 路單補記：${res==='B'?'莊':res==='P'?'閒':'和'}`);
+  STATE.current = {p:[null,null,null],b:[null,null,null],pf:[null,null,null],bf:[null,null,null],res:null,cursor:0};
+  paintBoard();
+}
+
+el('#kb').addEventListener('click', e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  const t = e.target.textContent.trim();
+  onKey(t);
+});
+
+function onKey(t){
+  const cur = STATE.current, idx = cur.cursor;
+
+  // 牌面
+  if(['1','2','3','4','5','6','7','8','9','10','J','Q','K'].includes(t)){
+    const val = keyToVal(t);
+    if(idx<=2){
+      const old = cur.pf[idx];
+      if(old!=null) STATE.count -= faceCountVal(old);
+      cur.p[idx]=val; cur.pf[idx]=t;
+    }else{
+      const k = idx-3;
+      const old = cur.bf[k];
+      if(old!=null) STATE.count -= faceCountVal(old);
+      cur.b[k]=val; cur.bf[k]=t;
+    }
+    STATE.count += faceCountVal(t);
+    if(idx<5) cur.cursor = idx+1;
+    paintBoard(); return;
+  }
+
+  if(t==='跳過'){
+    if(idx<5) cur.cursor = idx+1;
+    paintBoard(); return;
+  }
+
+  if(t==='清除'){
+    function get(k){ return k<=2 ? [cur.p[k],cur.pf[k]] : [cur.b[k-3],cur.bf[k-3]]; }
+    function setNone(k){ if(k<=2){cur.p[k]=null;cur.pf[k]=null;} else {const j=k-3;cur.b[j]=null;cur.bf[j]=null;} }
+
+    let [v,f] = get(idx);
+    if(f!=null){
+      STATE.count -= faceCountVal(f);
+      setNone(idx);
+    }else{
+      let j=idx-1;
+      while(j>=0 && get(j)[1]==null) j--;
+      if(j>=0){
+        const [,f2] = get(j);
+        if(f2!=null) STATE.count -= faceCountVal(f2);
+        setNone(j); cur.cursor=j;
+      }
+    }
+    paintBoard(); return;
+  }
+
+  if(t==='確認'){
+    const p2 = sum2(cur.p[0],cur.p[1]), b2 = sum2(cur.b[0],cur.b[1]);
+    if(p2==null || b2==null){
+      alert('請先輸入 閒1/閒2/莊1/莊2，或用上方「路單」補記');
+      return;
+    }
+
+    // 天牌
+    if([8,9].includes(p2) || [8,9].includes(b2)){
+      cur.p[2]=null; cur.pf[2]=null;
+      cur.b[2]=null; cur.bf[2]=null;
+      const res = p2>b2?'P':(b2>p2?'B':'T');
+      finishRound(res); return;
+    }
+
+    // 閒補
+    if(mustPlayerDraw(p2)){
+      if(cur.p[2]==null){
+        alert('依規則：閒需補第三張'); cur.cursor=2; paintBoard(); return;
+      }
+    }else if(playerMustStand(p2)){
+      if(cur.pf[2]!=null) STATE.count -= faceCountVal(cur.pf[2]);
+      cur.p[2]=null; cur.pf[2]=null;
+    }
+
+    // 莊補
+    const needB = (cur.p[2]==null) ? bankerDrawWhenPlayerStands(b2) : bankerShouldDraw(b2, cur.p[2]);
+    if(needB && cur.b[2]==null){
+      alert('依規則：莊需補第三張'); cur.cursor=5; paintBoard(); return;
+    }
+    if(!needB && cur.b[2]!=null){
+      if(cur.bf[2]!=null) STATE.count -= faceCountVal(cur.bf[2]);
+      cur.b[2]=null; cur.bf[2]=null;
+    }
+
+    const p_final = finalTotal([cur.p[0],cur.p[1]], cur.p[2]);
+    const b_final = finalTotal([cur.b[0],cur.b[1]], cur.b[2]);
+    const res = p_final>b_final?'P':(b_final>p_final?'B':'T');
+    finishRound(res); return;
+  }
+}
+
+function finishRound(res){
+  const cur = STATE.current;
+  STATE.history.push({res, p:[...cur.p], b:[...cur.b]});
+
+  // 建議下注
+  const { bet, side } = STATE.last_advice;
+  let win = 0;
+
+  if(res==='T'){
+    if(side==='T'){
+      win = Math.trunc(bet * (PAYOUTS['T']||0));
+      STATE.bankroll += win;
+      STATE.seq_idx = (STATE.seq_idx + 1) % 4;
+    }else{
+      win = 0; // 和局退本金
+    }
+  }else{
+    if(side===res){
+      win = Math.trunc(bet * (PAYOUTS[res]||0));
+      STATE.bankroll += win;
+      STATE.seq_idx = (STATE.seq_idx + 1) % 4;
+    }else{
+      STATE.bankroll -= bet;
+      win = -bet;
+      STATE.seq_idx = 0;
+    }
+  }
+
+  const p_final = finalTotal([cur.p[0],cur.p[1]], cur.p[2]);
+  const b_final = finalTotal([cur.b[0],cur.b[1]], cur.b[2]);
+  const pTxt = p_final==null ? '--' : String(p_final);
+  const bTxt = b_final==null ? '--' : String(b_final);
+  const predTxt = `${side==='B'?'莊':side==='P'?'閒':'和'} ${STATE.last_advice.bet}$`;
+
+  appendLog(`閒${pTxt}/莊${bTxt}  預測: ${predTxt}  結果: ${res==='B'?'莊':res==='P'?'閒':'和'}  ${win>=0?'+':''}${win}$`);
+
+  STATE.rounds_left = Math.max(0, STATE.rounds_left-1);
+  STATE.current = {p:[null,null,null],b:[null,null,null],pf:[null,null,null],bf:[null,null,null],res:null,cursor:0};
+  updateTop();
+  paintBoard();
+}
+
+// ===== 啟動 =====
+(function init(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  }
+  let seed = prompt('輸入本金（最低下注 100）', '5000');
+  let v = parseInt(seed||'5000',10);
+  if(!Number.isFinite(v) || v<MIN_BET) v = 5000;
+  STATE.seed = v; STATE.bankroll = v;
+  updateTop(); paintBoard();
+})();
+</script>
 </body>
 </html>
